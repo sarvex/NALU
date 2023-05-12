@@ -45,7 +45,7 @@ def load_data(op, scale, train_size, test_size):
     filename = "data/" + (("%s_%.2f_%d_%d.cache" % (op, scale, train_size, test_size)).replace('/', '_div_').replace(' ',''))
 
     if os.path.exists(filename):
-        logging.info("Load cache from %s" % filename)
+        logging.info(f"Load cache from {filename}")
         x_train, y_train, x_test_i, y_test_i, x_test_e, y_test_e, random_rmse_i, random_rmse_e =\
                 pickle.load(open(filename, "rb"))
     else:
@@ -126,7 +126,7 @@ def get_random_baseline(op, x_test_i, y_test_i, x_test_e, y_test_e, n_repeat=20)
                                         batch_size, shuffle=False)
 
     total_rmse_i, total_rmse_e = 0, 0
-    for i in range(n_repeat):
+    for _ in range(n_repeat):
         net = nn.Sequential()
         net.add(nn.Dense(HIDDEN_DIM))
         net.add(nn.Dense(1))
@@ -142,10 +142,12 @@ def train_static(op, net_type, net, x_train, y_train, x_test_i, y_test_i, x_test
                  random_i, random_e, params):
     batch_size = params['batch_size']
 
-    filename = "models/" + ((op + "." + net_type + ".params").replace('/', '_div_').replace(' ',''))
+    filename = "models/" + f"{op}.{net_type}.params".replace(
+        '/', '_div_'
+    ).replace(' ', '')
 
     if args.cont:
-        logging.info("Continue training from %s" % filename)
+        logging.info(f"Continue training from {filename}")
         if os.path.exists(filename):
             net.load_parameters(filename)
 
@@ -165,7 +167,7 @@ def train_static(op, net_type, net, x_train, y_train, x_test_i, y_test_i, x_test
     best_loss = 1e9
     best_round = 0
 
-    i_rmse = evaluate_rmse(net, test_i_data, ctx) 
+    i_rmse = evaluate_rmse(net, test_i_data, ctx)
     e_rmse = evaluate_rmse(net, test_e_data, ctx) 
 
     logging.info("Epoch: %2d\tBatch: %d\tI MSE: %.6f\tE MSE: %.6f\tI score: %.2f\tE score: %.2f" %
@@ -185,14 +187,18 @@ def train_static(op, net_type, net, x_train, y_train, x_test_i, y_test_i, x_test
             loss = np.sqrt(mx.nd.mean(loss).asscalar())
             moving_loss = loss if moving_loss is None else moving_loss * 0.98 + loss * 0.02
 
-        i_rmse = evaluate_rmse(net, test_i_data, ctx) 
+        i_rmse = evaluate_rmse(net, test_i_data, ctx)
         e_rmse = evaluate_rmse(net, test_e_data, ctx) 
 
         if moving_loss < best_loss:
             best_loss = moving_loss
             best_round = i
 
-        if best_round + params['early_stopping'] < i or (i_rmse / random_i * 100 < 0.005 and e_rmse / random_e * 100 < 0.005):
+        if (
+            best_round + params['early_stopping'] < i
+            or i_rmse / random_i < 5e-05
+            and e_rmse / random_e < 5e-05
+        ):
             break
 
         if i % print_every == 0:
@@ -206,12 +212,11 @@ def train_static(op, net_type, net, x_train, y_train, x_test_i, y_test_i, x_test
 
 
 def results_to_markdown(eval_results):
-    res_str = ""
-    res_str += "|     |"
+    res_str = "" + "|     |"
     for net_type in networks:
-        res_str += net_type + "|"
+        res_str += f"{net_type}|"
     res_str += "\n| --- | "
-    for net_type in networks:
+    for _ in networks:
         res_str += " --- |"
     res_str += "\n"
 
@@ -292,12 +297,12 @@ if __name__ == '__main__':
                     net.add(NAC(in_units=HIDDEN_DIM, units=1))
                     net.collect_params().initialize(mx.init.Uniform(args.init_scale), ctx=ctx)
                 else:
-                    raise ValueError("Invalid Network: " + net_type)
+                    raise ValueError(f"Invalid Network: {net_type}")
 
-            logging.info("Learn %s with %s" % (op, net_type))
+            logging.info(f"Learn {op} with {net_type}")
             i_rmse, e_rmse = train_static(op, net_type, net, x_train, y_train, x_test_i, y_test_i, x_test_e, y_test_e,
                                           random_rmse_i, random_rmse_e, params)
-            
+
             eval_results_i[(op, net_type)] = i_rmse
             eval_results_e[(op, net_type)] = e_rmse
 

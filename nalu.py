@@ -47,7 +47,5 @@ class NALU(nn.Block):
         W1 = nd.tanh(self.W1_hat.data()) * nd.sigmoid(self.M1_hat.data())
         a = nd.dot(x, W0)
         m = nd.exp(nd.dot(nd.log(nd.abs(x) + 1e-10), W1))
-        y = g * a + (1 - g) * m
-
-        return y
+        return g * a + (1 - g) * m
 
